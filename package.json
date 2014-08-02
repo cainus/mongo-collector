@@ -1,5 +1,5 @@
 {
-  "name": "mongo-collector",
+  "name": "recollection",
   "version": "0.0.0",
   "description": "yet another abstraction over mongo native client.  this one focuses on collection interactions only.",
   "main": "collector.js",
@@ -7,34 +7,37 @@
     "test": "test"
   },
   "dependencies": {
-    "async": "^0.9.0",
-    "bindable": "^0.5.38",
-    "expect.js": "^0.3.1",
-    "lodash": "^2.4.1",
-    "mongo-json-schema": "^0.2.6",
-    "mongodb": "^1.4.7"
+    "async": "0.9.0",
+    "bindable": "0.5.38",
+    "bindable-schema": "0.1.2",
+    "lodash": "2.4.1",
+    "mongo-json-schema": "0.2.6",
+    "mongodb": "1.4.7"
   },
   "devDependencies": {
-    "expect.js": "^0.3.1",
-    "jshint": "^2.5.2",
-    "mocha": "^1.20.1"
+    "traverse": "0.6.6",
+    "deep-equal": "0.2.1",
+    "difflet": "0.2.6",
+    "expect.js": "0.3.1",
+    "jshint": "2.5.2",
+    "mocha": "1.20.1"
   },
   "scripts": {
     "test": "mocha"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/cainus/mongo-collector.git"
+    "url": "git://github.com/cainus/recollection.git"
   },
   "keywords": [
     "mongo",
     "collection",
-    "collector"
+    "mongodb"
   ],
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/cainus/mongo-collector/issues"
+    "url": "https://github.com/cainus/recollection/issues"
   },
-  "homepage": "https://github.com/cainus/mongo-collector"
+  "homepage": "https://github.com/cainus/recollection"
 }

@@ -1,12 +1,58 @@
 process.env.NODE_ENV = 'testing';
-var BaseModel = require("../collector");
+var BaseModel = require("../index");
 var expect = require("expect.js");
 var ObjectID = require("mongodb").ObjectID;
-var database = require('../../../lib/api2/util/database').init("default");
-var testHelpers = require('../../../testHelpers');
-var failOnError = testHelpers.failOnError;
-var assertObjectEquals = testHelpers.assertObjectEquals;
+var difflet = require('difflet');
+var deepEqual = require('deep-equal');
+var traverse = require('traverse');
+var assert = require('assert');
+var MongoClient = require('mongodb').MongoClient;
+var Server = require('mongodb').Server;
+var _ = require('lodash');
 
+var failOnError = function(err){
+  if (err){
+    console.error("");
+    console.error("unexpected error: ", (err.message || err));
+    console.error(err);
+    console.error(new Error().stack);
+    console.error("");
+    throw "unexpected error: " + JSON.stringify((err.message || err));
+  }
+};
+
+var assertObjectEquals = function(actual, expected, options){
+  if (options && options.unordered) {
+    actual = actual.map(JSON.stringify).sort().map(JSON.parse);
+    expected = expected.map(JSON.stringify).sort().map(JSON.parse);
+  }
+
+  // strip the milliseconds off all dates
+  traverse(expected).forEach(function (x) {
+    if (_.isDate(x)) {
+      x.setMilliseconds(0);
+      this.update(x);
+    }
+  });
+  // strip the milliseconds off all dates
+  traverse(actual).forEach(function (x) {
+    if (_.isDate(x)) {
+      x.setMilliseconds(0);
+      this.update(x);
+    }
+  });
+  if (!deepEqual(actual, expected)){
+    process.stdout.write(difflet.compare(actual, expected));
+    console.log("\n\nactual");
+    console.log(JSON.stringify(actual, null, 2));
+    console.log("\n\nexpected");
+    console.log(JSON.stringify(expected, null, 2));
+    console.log("\n\n");
+    assert.fail(actual, expected);
+    return false;
+  }
+  return true;
+};
 
 // old-style validator schema
 var schema = {
@@ -38,6 +84,7 @@ describe("BaseModel", function() {
   var testcollection = "students";
   var db;
   var model;
+
   var collection = function() {
     return db.collection('fakeusers');
   };
@@ -51,10 +98,17 @@ describe("BaseModel", function() {
   };
 
   before(function(done) {
-    database.get(function (err, dbase) {
-      db = dbase;
+    // Set up the connection to the local db
+    var mongoclient = new MongoClient(
+        new Server("localhost", 27017), {native_parser: true}
+    );
+    // Open the connection to the server
+    mongoclient.open(function(err, mongoclient) {
+
+      // Get the first db and do an update document on it
+      db = mongoclient.db("tests");
       collection().drop(function(err){
-        model = new BaseModel('fakeusers', schema);
+        model = new BaseModel('fakeusers', schema, db);
         done();
       });
     });
@@ -78,14 +132,12 @@ describe("BaseModel", function() {
 
       // Ensure indices is asynchronous.
       setTimeout(function() {
-        database.get(function (err, dbase) {
-          collection().indexInformation(function(err, info) {
-            failOnError(err);
-            var expected = { _id_: [ [ '_id', 1 ] ],
-                             firstName_1: [ [ 'firstName', 1 ] ]};
-            assertObjectEquals(info, expected);
-            done();
-          });
+        collection().indexInformation(function(err, info) {
+          failOnError(err);
+          var expected = { _id_: [ [ '_id', 1 ] ],
+                           firstName_1: [ [ 'firstName', 1 ] ]};
+          assertObjectEquals(info, expected);
+          done();
         });
       }, 300);
     });
@@ -101,17 +153,15 @@ describe("BaseModel", function() {
 
       // Ensure indices is asynchronous.
       setTimeout(function() {
-        database.get(function (err, dbase) {
-          collection().indexInformation(function(err, info) {
-            failOnError(err);
-            var expected = {
-              _id_:         [ [ '_id', 1 ] ],
-              firstName_1:  [ [ 'firstName', 1 ] ],
-             'lastName_-1': [ [ 'lastName', -1 ] ]
-            };
-            assertObjectEquals(info, expected);
-            done();
-          });
+        collection().indexInformation(function(err, info) {
+          failOnError(err);
+          var expected = {
+            _id_:         [ [ '_id', 1 ] ],
+            firstName_1:  [ [ 'firstName', 1 ] ],
+           'lastName_-1': [ [ 'lastName', -1 ] ]
+          };
+          assertObjectEquals(info, expected);
+          done();
         });
       }, 300);
     });
@@ -203,6 +253,7 @@ describe("BaseModel", function() {
     before(function() {
       oldModel = model;
       model = new BaseModel('fakeusers');
+      model.database(db);
       model.schema(jsonSchema);
     });
 
@@ -369,6 +420,7 @@ describe("BaseModel", function() {
       oldModel = model;
       model = new BaseModel('fakeusers');
       model.schema(jsonSchema);
+      model.database(db);
       //insert documents to do updates
       var doc1 = {
         _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
@@ -449,6 +501,7 @@ describe("BaseModel", function() {
       oldModel = model;
       model = new BaseModel('fakeusers');
       model.schema(jsonSchema);
+      model.database(db);
       // Documents to update.
       var docs = [
         {
@@ -504,6 +557,7 @@ describe("BaseModel", function() {
       oldModel = model;
       model = new BaseModel('fakeusers');
       model.schema(jsonSchema);
+      model.database(db);
       // Documents to update.
       var docs = [
         {
@@ -616,6 +670,7 @@ describe("BaseModel", function() {
       oldModel = model;
       model = new BaseModel('fakeusers');
       model.schema(jsonSchema);
+      model.database(db);
       var doc = {
         _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
         firstName: "class",
@@ -655,6 +710,7 @@ describe("BaseModel", function() {
     beforeEach(function(done) {
       oldModel = model;
       model = new BaseModel('fakeusers');
+      model.database(db);
       var doc1 = {
         _id: ObjectID("52535efb0555c1353a75f57e"),
         firstName: "class",
