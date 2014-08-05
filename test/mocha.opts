@@ -1,0 +1,6 @@
+--require ./testHelpers
+--globals CONFIG
+--check-leaks
+--reporter dot
+--ui bdd
+--timeout 2000
