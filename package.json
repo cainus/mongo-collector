@@ -1,6 +1,6 @@
 {
   "name": "recollection",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "yet another abstraction over mongo native client.  this one focuses on collection interactions only.",
   "main": "collector.js",
   "directories": {
@@ -11,7 +11,7 @@
     "bindable": "0.5.38",
     "bindable-schema": "0.1.2",
     "lodash": "2.4.1",
-    "mongo-json-schema": "0.2.6",
+    "mongo-json-schema": "0.2.8",
     "mongodb": "1.4.7"
   },
   "devDependencies": {
