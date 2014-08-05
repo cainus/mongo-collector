@@ -744,7 +744,7 @@ module.exports = BaseModel;
   private fns
  */
 
-_validateSomeFields = function(me, object, cb) {
+var _validateSomeFields = function(me, object, cb) {
   var fieldsToTest, model;
   fieldsToTest = Object.keys(object);
   model = new Bindable.Object(object);
@@ -753,7 +753,7 @@ _validateSomeFields = function(me, object, cb) {
   }, cb);
 };
 
-_convertOidFields = function(me, objects, cb) {
+var _convertOidFields = function(me, objects, cb) {
   var e, field, object, _i, _j, _len, _len1, _ref;
   if (!_.isArray(objects)) {
     objects = [objects];
@@ -778,7 +778,7 @@ _convertOidFields = function(me, objects, cb) {
   return cb(null);
 };
 
-_validateAllFields = function(me, docs, cb) {
+var _validateAllFields = function(me, docs, cb) {
   if (!_.isArray(docs)) {
     docs = [docs];
   }
@@ -789,7 +789,7 @@ _validateAllFields = function(me, docs, cb) {
   }, cb);
 };
 
-_sanitizeDocuments = function(me, docs) {
+var _sanitizeDocuments = function(me, docs) {
   var isArray, ne;
   if (!(isArray = _.isArray(docs))) {
     docs = [docs];
@@ -804,7 +804,7 @@ _sanitizeDocuments = function(me, docs) {
   }
 };
 
-oidTest = function(name) {
+var oidTest = function(name) {
   return [
     {
       test: function(v, next) {
@@ -819,7 +819,7 @@ oidTest = function(name) {
   ];
 };
 
-decorateError = function(err, type, detail) {
+var decorateError = function(err, type, detail) {
   Object.defineProperty(err, 'type', {
     value: type,
     enumerable: true,
