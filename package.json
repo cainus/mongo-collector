@@ -1,6 +1,6 @@
 {
   "name": "recollection",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "yet another abstraction over mongo native client.  this one focuses on collection interactions only.",
   "main": "collector.js",
   "directories": {

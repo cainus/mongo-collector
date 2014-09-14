@@ -1,5 +1,3 @@
-var Bindable = require("bindable");
-var BindableSchema = require("bindable-schema");
 var _ = require("lodash");
 var mongoObjectID = require("mongodb").ObjectID;
 var async = require("async");
@@ -20,37 +18,30 @@ var BaseModel = (function() {
       throw new Error('collectionName cannot be null');
     }
     this.__collectionName = collectionName;
+    schema = schema || {};
     if (schema) {
-      this.__schema = new BindableSchema(schema);
-      this.__schema.use(BindableSchema.plugins.validator);
-      this.__fields = Object.keys(schema);
-      this.__oidFields = Object.keys(_.pick(schema, function(v, k) {
-        return v.$special === "oid";
-      }));
+      this.jsonSchema = Schema(schema, {name : this.__collectionName});
     }
-    this.__outputFormatter = null;
+    this.outputFormatter(function(doc){
+      return doc;
+    });
     if (overrideDatabase) {
       this.overrideDatabase = overrideDatabase;
     }
-    this.jsonSchema = null;
   }
 
   BaseModel.prototype.outputFormatter = function(f) {
-    this.__outputFormatter = f;
-  };
-
-  BaseModel.prototype.schema = function(schema, options) {
-    if (!schema) {
-      return this.jsonSchema;
-    } else {
-      if (this.__collectionName) {
-        if (!options) {
-          options = {};
-        }
-        options.name = this.__collectionName;
+    var that = this;
+    this.__outputFormatter = function(obj){
+      if (Array.isArray(obj)){
+        return obj.map(function(item){
+          item = that.jsonSchema.idsToStrings(item);
+          return f(item);
+        });
       }
-      this.jsonSchema = Schema(schema, options);
-    }
+      var stringy = that.jsonSchema.idsToStrings(obj);
+      return f(stringy);
+    };
   };
 
   BaseModel.prototype.indices = indices = function(indices) {
@@ -152,46 +143,12 @@ var BaseModel = (function() {
               result = schema.idsToStrings(result[0]);
             }
           }
-          if (outputFormatter) {
-            result = outputFormatter(result);
-          }
+          result = outputFormatter(result);
           return cb(err, result);
         });
       });
     });
   };
-
-  BaseModel.prototype.oldCreate = function(properties, cb) {
-    var sanitized;
-    sanitized = _sanitizeDocuments(this, properties);
-    return _convertOidFields(this, sanitized, (function(_this) {
-      return function(err) {
-        if (err) {
-          return cb(err);
-        }
-        return _validateAllFields(_this, sanitized, function(err) {
-          if (err) {
-            return cb(err);
-          }
-          return _this.collection(function(err, collection) {
-            if (err) {
-              return cb(err);
-            }
-            return collection.insert(sanitized, {
-              j: true,
-              getLastError: 1,
-              safe: true
-            }, function(err, result) {
-              return process.nextTick(function() {
-                return cb(err, result);
-              });
-            });
-          });
-        });
-      };
-    })(this));
-  };
-
 
   /*
     New create that simply inserts whats passed to it into mongo.
@@ -479,9 +436,7 @@ var BaseModel = (function() {
             if (_this.jsonSchema && doc) {
               doc = _this.jsonSchema.idsToStrings(doc);
             }
-            if (_this.__outputFormatter) {
-              doc = _this.__outputFormatter(doc);
-            }
+            doc = _this.__outputFormatter(doc);
             return cb(err, doc);
           });
         });
@@ -532,14 +487,7 @@ var BaseModel = (function() {
           }
           return collection.find(query, options).toArray(function(err, docs) {
             return process.nextTick(function() {
-              if (_this.jsonSchema && docs) {
-                docs = docs.map(function(doc) {
-                  return _this.jsonSchema.idsToStrings(doc);
-                });
-              }
-              if (_this.__outputFormatter) {
-                docs = docs.map(_this.__outputFormatter);
-              }
+              docs = _this.__outputFormatter(docs);
               return cb(err, docs);
             });
           });
@@ -552,9 +500,6 @@ var BaseModel = (function() {
     if (_.isFunction(options)) {
       cb = options;
       options = {};
-    }
-    if (this.jsonSchema && JSON.stringify(query).indexOf("$") === -1) {
-      query = this.jsonSchema.stringsToIds(query);
     }
     return _convertOidFields(this, query, (function(_this) {
       return function(err) {
@@ -640,30 +585,26 @@ var BaseModel = (function() {
     if (!cb || !_.isFunction(cb)) {
       throw new Error("remove() expects a callback");
     }
-    if (this.jsonSchema && JSON.stringify(query).indexOf("$") === -1) {
-      query = this.jsonSchema.stringsToIds(query);
-    }
-    return _convertOidFields(this, query, (function(_this) {
-      return function(err) {
+    var that = this;
+    return _convertOidFields(this, query, function(err) {
+      if (err) {
+        return cb(err);
+      }
+      that.collection(function(err, collection) {
+        var _ref, _ref1;
         if (err) {
           return cb(err);
         }
-        return _this.collection(function(err, collection) {
-          var _ref, _ref1;
-          if (err) {
+        return collection.remove(query, {
+          journal: true,
+          w: 1
+        }, function(err) {
+          return process.nextTick(function() {
             return cb(err);
-          }
-          return collection.remove(query, {
-            journal: true,
-            w: 1
-          }, function(err) {
-            return process.nextTick(function() {
-              return cb(err);
-            });
           });
         });
-      };
-    })(this));
+      });
+    });
   };
 
   BaseModel.prototype.removeById = function(id, cb) {
@@ -747,7 +688,6 @@ module.exports = BaseModel;
 var _validateSomeFields = function(me, object, cb) {
   var fieldsToTest, model;
   fieldsToTest = Object.keys(object);
-  model = new Bindable.Object(object);
   return async.eachSeries(Object.keys(object), function(v, next) {
     return me.__schema.validateField(v, model, next);
   }, cb);

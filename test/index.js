@@ -6,20 +6,6 @@ var Server = require('mongodb').Server;
 
 
 
-// old-style validator schema
-var schema = {
-  $name: "fakeusers",
-  _id: {
-    $special: "oid",
-    $validate: BaseModel.oidTest("_id")
-  },
-  firstName: {
-    $type: 'string',
-    $required: true
-  },
-  lastName: 'string'
-};
-
 // new-style json Schema
 var jsonSchema = {
   firstName: {
@@ -60,7 +46,7 @@ describe("BaseModel", function() {
       // Get the first db and do an update document on it
       db = mongoclient.db("tests");
       collection().drop(function(err){
-        model = new BaseModel('fakeusers', schema, db);
+        model = new BaseModel('fakeusers', jsonSchema, db);
         done();
       });
     });
@@ -120,93 +106,14 @@ describe("BaseModel", function() {
 
   });
 
-  describe("#create (with old Validator schema)", function() {
-
-    describe("one document", function() {
-      after(function(done) {
-        dropCollection(done);
-      });
-
-      it("should create the document in the database", function(done) {
-        var newDoc = {
-          firstName: "class",
-          lastName: "dojo"
-        };
-        model.create(newDoc, function(err, doc) {
-          expect(err).to.be(null);
-          //let's check the database
-          collection().find({firstName: "class"}).toArray(function(err, docs) {
-            process.nextTick(function() {
-              expect(docs).to.have.length(1);
-              done();
-            });
-          });
-        });
-      });
-
-      it("should require all required fields", function(done) {
-        var newDoc = {
-          lastName: "dojo"
-        };
-        model.create(newDoc, function(err, doc) {
-          expect(err).to.be.an(Error);
-          expect(err.message).to.be("firstName must be present");
-          done();
-        });
-      });
-    });
-
-    describe("an array of documents", function() {
-
-      it("should properly create an array of documents", function(done) {
-        var newDoc1 = {
-          firstName: "class"
-        };
-        var newDoc2 = {
-          firstName: "dojo"
-        };
-        model.create([newDoc1, newDoc2], function(err, docs) {
-          expect(err).to.be(null);
-          expect(docs).to.have.length(2);
-          collection().find().toArray(function(err, docs) {
-            process.nextTick(function() {
-              expect(docs).to.have.length(2);
-              dropCollection(done);
-            });
-          });
-        });
-      });
-
-      it("should not save anything if one document fails validation", function(done) {
-        var newDoc1 = {
-          firstName: "class"
-        };
-        var badDoc = {
-          lastName: "bad"
-        };
-        model.create([newDoc1, badDoc], function(err, docs) {
-          expect(err).to.be.an(Error);
-          expect(arguments).to.have.length(1);
-          collection().find().toArray(function(err, docs) {
-            process.nextTick(function() {
-              expect(docs).to.have.length(0);
-              done(err);
-            });
-          });
-        });
-      });
-    });
-  });
-
-  describe("#create (with new JSON schema)", function() {
+  describe("#create", function() {
 
     var oldModel;
 
     before(function() {
       oldModel = model;
-      model = new BaseModel('fakeusers');
+      model = new BaseModel('fakeusers', jsonSchema);
       model.database(db);
-      model.schema(jsonSchema);
     });
 
     describe("one document", function() {
@@ -288,90 +195,13 @@ describe("BaseModel", function() {
     });
   });
 
-  describe("#update (with old Validator schema)", function() {
-
-    beforeEach(function(done) {
-      //insert a document to do updates
-      var doc = {
-        _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
-        firstName: "class",
-        lastName: "dojo"
-      };
-      collection().insert(doc, done);
-    });
-
-    afterEach(function(done) {
-      dropCollection(done);
-    });
-
-    it("should create an error when an _id is not passed in", function(done) {
-      var updateDoc = {
-        firstName: "class"
-      };
-      model.update(updateDoc, function(err, doc) {
-        expect(err).to.be.an(Error);
-        expect(err.message).to.contain("_id");
-        done();
-      });
-    });
-
-    it("should create an error when an _id is not valid", function(done) {
-      var updateDoc = {
-        _id: "notValid"
-      };
-      model.update(updateDoc, function(err, doc) {
-        expect(err.message).to.equal("Must provide a valid MongoId for `_id`");
-        done();
-      });
-    });
-    it("should update a document when at least one schema field is passed in", function(done) {
-      var updateDoc = {
-        _id: "52535efb0555c1353a75f54b",
-        firstName: "school"
-      };
-      model.update(updateDoc, function(err, doc) {
-        expect(err).to.be(null);
-        expect(doc).to.have.property("firstName", "school");
-        done();
-      });
-    });
-
-    it("should allow a non-required field to be updated", function(done) {
-      var updateDoc = {
-        _id: "52535efb0555c1353a75f54b",
-        lastName: "dodo"
-      };
-      model.update(updateDoc, function(err, doc) {
-        expect(err).to.be(null);
-        expect(doc).to.have.property("lastName", "dodo");
-        done();
-      });
-    });
-
-    it("should not update the document when a field not defined in the schema is passed in", function(done) {
-      var updateDoc = {
-        _id: "52535efb0555c1353a75f54b",
-        nonField: "aValue"
-      };
-      model.update(updateDoc, function(err, doc) {
-        expect(err).to.be(null);
-        expect(doc).to.have.property("firstName", "class");
-        expect(doc).to.have.property("lastName", "dojo");
-        expect(doc.nonField).to.be(undefined);
-        done();
-      });
-    });
-
-  });
-
-  describe("#update (with new JSON schema)", function() {
+  describe("#update", function() {
 
     var oldModel;
 
     beforeEach(function(done) {
       oldModel = model;
-      model = new BaseModel('fakeusers');
-      model.schema(jsonSchema);
+      model = new BaseModel('fakeusers', jsonSchema);
       model.database(db);
       //insert documents to do updates
       var doc1 = {
@@ -383,7 +213,7 @@ describe("BaseModel", function() {
         _id: ObjectID("52535efb0555c1353a75f54c"),//explicit _id set
         firstName: "crass",
         lastName: "mojo"
-      }; 
+      };
       collection().insert([doc1, doc2], done);
     });
 
@@ -451,8 +281,7 @@ describe("BaseModel", function() {
 
     beforeEach(function(done) {
       oldModel = model;
-      model = new BaseModel('fakeusers');
-      model.schema(jsonSchema);
+      model = new BaseModel('fakeusers', jsonSchema);
       model.database(db);
       // Documents to update.
       var docs = [
@@ -507,8 +336,7 @@ describe("BaseModel", function() {
 
     beforeEach(function(done) {
       oldModel = model;
-      model = new BaseModel('fakeusers');
-      model.schema(jsonSchema);
+      model = new BaseModel('fakeusers', jsonSchema);
       model.database(db);
       // Documents to update.
       var docs = [
@@ -579,7 +407,7 @@ describe("BaseModel", function() {
     });
   });
 
-  describe("#findById (with old-style schemas)", function() {
+  describe("#findById", function() {
     before(function(done) {
       var doc = {
         _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
@@ -596,7 +424,7 @@ describe("BaseModel", function() {
     it("can find by string id", function(done) {
       model.findById("52535efb0555c1353a75f54b", function(err, doc) {
         failOnError(err);
-        var expected = {"_id" : ObjectID('52535efb0555c1353a75f54b'),
+        var expected = {"_id" : '52535efb0555c1353a75f54b',
                         "firstName":"class",
                         "lastName":"dojo"};
         assertObjectEquals(doc, expected);
@@ -606,7 +434,7 @@ describe("BaseModel", function() {
     it("can find by object id", function(done) {
       model.findById(ObjectID("52535efb0555c1353a75f54b"), function(err, doc) {
         failOnError(err);
-        var expected = {"_id" : ObjectID('52535efb0555c1353a75f54b'),
+        var expected = {"_id" : '52535efb0555c1353a75f54b',
                         "firstName":"class",
                         "lastName":"dojo"};
         assertObjectEquals(doc, expected);
@@ -615,13 +443,12 @@ describe("BaseModel", function() {
     });
   });
 
-  describe("#findById (with new-style schemas)", function() {
+  describe("#findById", function() {
     var oldModel;
 
     before(function(done) {
       oldModel = model;
-      model = new BaseModel('fakeusers');
-      model.schema(jsonSchema);
+      model = new BaseModel('fakeusers', jsonSchema);
       model.database(db);
       var doc = {
         _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
@@ -702,7 +529,7 @@ describe("BaseModel", function() {
       model.findOne({ firstName : 'class'}, function(err, parents) {
         failOnError(err);
         var expected = {
-          _id: ObjectID("52535efb0555c1353a75f57e"),//explicit _id set
+          _id: "52535efb0555c1353a75f57e",//explicit _id set
           firstName: "class",
           lastName: "dojo",
           fullName : "class dojo"
@@ -723,7 +550,7 @@ describe("BaseModel", function() {
       model.findById('52535efb0555c1353a75f57e', function(err, parents) {
         failOnError(err);
         var expected = {
-          _id: ObjectID("52535efb0555c1353a75f57e"),//explicit _id set
+          _id: "52535efb0555c1353a75f57e",//explicit _id set
           firstName: "class",
           lastName: "dojo",
           fullName : "class dojo"
@@ -745,13 +572,13 @@ describe("BaseModel", function() {
         failOnError(err);
         var expected = [
           {
-            _id: ObjectID("52535efb0555c1353a75f57e"),//explicit _id set
+            _id: "52535efb0555c1353a75f57e",//explicit _id set
             firstName: "class",
             lastName: "dojo",
             fullName : "class dojo"
           },
           {
-            _id: ObjectID("52535efb0555c1353a75f55c"),//explicit _id set
+            _id: "52535efb0555c1353a75f55c",//explicit _id set
             firstName: "teacher's",
             lastName: "pet",
             fullName : "teacher's pet"
@@ -774,13 +601,13 @@ describe("BaseModel", function() {
         failOnError(err);
         var expected = [
           {
-            _id: ObjectID("52535efb0555c1353a75f55c"),//explicit _id set
+            _id: "52535efb0555c1353a75f55c",//explicit _id set
             firstName: "teacher's",
             lastName: "pet",
             fullName : "teacher's pet"
           },
           {
-            _id: ObjectID("52535efb0555c1353a75f57e"),//explicit _id set
+            _id: "52535efb0555c1353a75f57e",//explicit _id set
             firstName: "class",
             lastName: "dojo",
             fullName : "class dojo"
@@ -819,12 +646,12 @@ describe("BaseModel", function() {
         failOnError(err);
         var expected = [
           {
-            _id: ObjectID("52535efb0555c1353a75f55c"),//explicit _id set
+            _id: "52535efb0555c1353a75f55c",//explicit _id set
             firstName: "teacher's",
             lastName: "pet"
           },
           {
-            _id: ObjectID("52535efb0555c1353a75f57e"),//explicit _id set
+            _id: "52535efb0555c1353a75f57e",//explicit _id set
             firstName: "class",
             lastName: "dojo"
           }
@@ -894,17 +721,24 @@ describe("BaseModel", function() {
     });
 
     it("should return an array of documents if they're present in the database", function(done) {
-      model.find({_id: "52535efb0555c1353a75f54b"}, function(err, docs) {
-        expect(err).to.be(null);
-        expect(docs).to.be.an(Array);
-        expect(docs).to.have.length(1);
+      //model.find({_id: "52535efb0555c1353a75f54b"}, function(err, docs) {
+      model.find({}, function(err, docs) {
+        failOnError(err);
+        var expected = [
+          {
+            "_id": "52535efb0555c1353a75f54b",
+            "firstName": "class",
+            "lastName": "dojo"
+          }
+        ];
+        assertObjectEquals(docs, expected);
         done();
       });
     });
 
     it("should not return a document if it is not present in the database", function(done) {
       model.find({_id: "52535efb0555c1353a750000"}, function(err, docs) {
-        expect(err).to.be(null);
+        failOnError(err);
         expect(docs).to.be.an(Array);
         expect(docs).to.have.length(0);
         done();
@@ -912,8 +746,8 @@ describe("BaseModel", function() {
     });
 
     it("should return only one document for findOne", function(done) {
-      model.findOne({_id: "52535efb0555c1353a75f54b"}, function(err, doc) {
-        expect(err).to.be(null);
+      model.findOne({_id: ObjectID("52535efb0555c1353a75f54b")}, function(err, doc) {
+        failOnError(err);
         expect(doc).to.have.property('firstName', 'class');
         done();
       });
@@ -968,17 +802,6 @@ describe("BaseModel", function() {
       dropCollection(done);
     });
 
-    it("should not remove any documents on a malformed query", function(done) {
-      model.remove({_id: "Hello"}, function(err) {
-        expect(err).to.be.an(Error);
-        collection().find().toArray(function(err, docs) {
-          expect(err).to.be(null);
-          expect(docs).to.have.length(2);
-          done();
-        });
-      });
-    });
-
     it("should not remove any documents on a query that has no hits", function(done) {
       model.remove({lastName: "doesNotExist"}, function(err) {
         expect(err).to.be(null);
@@ -991,7 +814,7 @@ describe("BaseModel", function() {
     });
 
     it("should remove a matching document", function(done) {
-      model.remove({_id: "52535efb0555c1353a75f54b"}, function(err) {
+      model.remove({_id: ObjectID("52535efb0555c1353a75f54b")}, function(err) {
         expect(err).to.be(null);
         collection().find().toArray(function(err, docs) {
           expect(err).to.be(null);
