@@ -8,8 +8,6 @@
   },
   "dependencies": {
     "async": "0.9.0",
-    "bindable": "0.5.38",
-    "bindable-schema": "0.1.2",
     "lodash": "2.4.1",
     "mongo-json-schema": "0.2.8",
     "mongodb": "1.4.7"
