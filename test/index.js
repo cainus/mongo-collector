@@ -195,6 +195,87 @@ describe("BaseModel", function() {
     });
   });
 
+  describe("#ensure", function() {
+
+    var oldModel;
+
+    beforeEach(function(done) {
+      oldModel = model;
+      model = new BaseModel('fakeusers', jsonSchema);
+      model.database(db);
+      //insert documents to do updates
+      var doc1 = {
+        _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
+        firstName: "class",
+        lastName: "dojo"
+      };
+      var doc2 = {
+        _id: ObjectID("52535efb0555c1353a75f54c"),//explicit _id set
+        firstName: "crass",
+        lastName: "mojo"
+      };
+      collection().insert([doc1, doc2], done);
+    });
+
+    afterEach(function(done) {
+      model = oldModel;
+      dropCollection(done);
+    });
+
+    it("returns a document when a document can be found", function(done) {
+      var doc = {
+        firstName: "class",
+        lastName: "dojo"
+      };
+      model.ensure(doc, function(err, doc) {
+        failOnError(err);
+        assertObjectEquals(doc, {
+          firstName : 'class',
+          lastName : 'dojo',
+          _id : "52535efb0555c1353a75f54b"
+        });
+        done();
+      });
+    });
+    it("creates a document when no matching document can be found", function(done) {
+      var doc = {
+        firstName: "school",
+        lastName: "dojo"
+      };
+      model.ensure(doc, function(err, doc) {
+        failOnError(err);
+        expect(model.isObjectID(doc._id)).to.be(true);
+        delete doc._id;
+        assertObjectEquals(doc, {firstName : 'school', lastName : 'dojo'});
+        done();
+      });
+    });
+    it("can add additional fields when provided", function(done) {
+      var doc = {
+        firstName: "school",
+      };
+      model.ensure(doc, { lastName : 'dojo' }, function(err, doc) {
+        failOnError(err);
+        expect(model.isObjectID(doc._id)).to.be(true);
+        delete doc._id;
+        assertObjectEquals(doc, {firstName : 'school', lastName : 'dojo'});
+        done();
+      });
+    });
+    it("fails when a field not defined in the schema is passed in", function(done) {
+      var updateDoc = {
+        firstName: "school",
+        lastName: "dojo",
+        zoobuddydoo : true
+      };
+      model.ensure({firstName : "school", lastName : "dojo"}, updateDoc, function(err, doc) {
+        expect(err.errors[0].message).to.be("Additional properties are not allowed");
+        done();
+      });
+    });
+
+  });
+
   describe("#upsert", function() {
 
     var oldModel;
@@ -256,6 +337,7 @@ describe("BaseModel", function() {
       });
     });
   });
+
   describe("#update", function() {
 
     var oldModel;

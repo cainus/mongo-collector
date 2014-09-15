@@ -176,6 +176,59 @@ var BaseModel = (function() {
     });
   };
 
+  // ensure() is basically findOrCreate()
+  // @query : a partial doc to identify qualities that must exist
+  // @additional : (optional) if the doc doesn't exist, these properties
+  // get merged before the doc gets created.
+
+  BaseModel.prototype.ensure = function(query, additional, cb) {
+    var err, ex, schema, _id;
+    if (arguments.length == 2){
+      cb = additional;
+      additional = {};
+    }
+    if (!_.isFunction(cb)){
+      throw new Error("cb must be a function");
+    }
+    var doc = _.defaults(query, additional);
+    schema = this.jsonSchema;
+    try {
+      schema.partialValidate(doc);
+    } catch (_error) {
+      ex = _error;
+      return cb(ex);
+    }
+    doc = schema.stringsToIds(doc);
+    var _this = this;
+    this.collection(function(err, collection) {
+      if (err) {
+        return cb(err);
+      }
+      var sort = [['_id', 'asc']];
+      var options = {
+        journal: true,
+        getLastError: 1,
+        'new': true,
+        upsert : true
+      };
+      return collection.findAndModify(query, sort, doc, options, function(err, result) {
+        return process.nextTick(function() {
+          if (err) {
+            return cb(err);
+          }
+          if (!result) {
+            err = new Error("ensure failed for an unknown reason");
+            err.collection = _this.__collectionName;
+            return cb(err);
+          }
+          if (schema) {
+            result = schema.idsToStrings(result);
+          }
+          return cb(null, result);
+        });
+      });
+    });
+  };
   // @query : a query to identify the doc to update if it exists
   // @update : if the query finds something it gets updated to this document.  if it
   // doesn't find anything, this document gets inserted.
@@ -222,9 +275,6 @@ var BaseModel = (function() {
   BaseModel.prototype.update = function(toUpdate, options, cb) {
     var err, ex, schema, _id;
     schema = this.jsonSchema;
-    if (!schema) {
-      return this.oldUpdate(toUpdate, options, cb);
-    }
     if (_.isFunction(options)) {
       cb = options;
       options = {};
@@ -347,57 +397,6 @@ var BaseModel = (function() {
       });
     });
   };
-
-  BaseModel.prototype.oldUpdate = function(properties, options, cb) {
-    if (_.isFunction(options)) {
-      cb = options;
-      options = {};
-    }
-    properties._id = properties._id || "";
-    return _convertOidFields(this, properties, (function(_this) {
-      return function(err) {
-        var propertiesWithoutId, sanitized, _id;
-        if (err) {
-          return cb(err);
-        }
-        _id = properties._id;
-        propertiesWithoutId = _.omit(properties, "_id");
-        sanitized = _.pick(propertiesWithoutId, _this.__fields);
-        return _validateSomeFields(_this, sanitized, function(err) {
-          if (err) {
-            return cb(err);
-          }
-          return _this.collection(function(err, collection) {
-            if (err) {
-              return cb(err);
-            }
-            return collection.findAndModify({
-              _id: _id
-            }, [['_id', 'asc']], {
-              $set: sanitized
-            }, _.extend({
-              journal: true,
-              getLastError: 1,
-              "new": true
-            }, options), (function(_this) {
-              return function(err, result) {
-                return process.nextTick(function() {
-                  if (err) {
-                    return cb(err);
-                  } else if (!result) {
-                    return cb(new Error("" + _this.__collectionName + " with `_id` does not exist"));
-                  } else {
-                    return cb(null, result);
-                  }
-                });
-              };
-            })(this));
-          });
-        });
-      };
-    })(this));
-  };
-
 
   /*
     Unsets the specified field in mongo. No safety checks,
