@@ -176,6 +176,49 @@ var BaseModel = (function() {
     });
   };
 
+  // @query : a query to identify the doc to update if it exists
+  // @update : if the query finds something it gets updated to this document.  if it
+  // doesn't find anything, this document gets inserted.
+  // NOTE: the entire document is replaced!
+  BaseModel.prototype.upsert = function(query, update, cb) {
+    var err, ex, schema, _id;
+    schema = this.jsonSchema;
+    try {
+      schema.partialValidate(update);
+    } catch (_error) {
+      ex = _error;
+      return cb(ex);
+    }
+    update = schema.stringsToIds(update);
+    var _this = this;
+    this.collection(function(err, collection) {
+      if (err) {
+        return cb(err);
+      }
+      var options = {
+        multi: false,
+        getLastError: 1,
+        upsert: true
+      };
+      return collection.update(query, update, options, function(err, result) {
+        return process.nextTick(function() {
+          if (err) {
+            return cb(err);
+          }
+          if (!result) {
+            err = new Error("upsert failed for an unknown reason");
+            err.collection = _this.__collectionName;
+            return cb(err);
+          }
+          if (schema) {
+            update = schema.idsToStrings(update);
+          }
+          return cb(null, update);
+        });
+      });
+    });
+  };
+
   BaseModel.prototype.update = function(toUpdate, options, cb) {
     var err, ex, schema, _id;
     schema = this.jsonSchema;

@@ -195,6 +195,67 @@ describe("BaseModel", function() {
     });
   });
 
+  describe("#upsert", function() {
+
+    var oldModel;
+
+    beforeEach(function(done) {
+      oldModel = model;
+      model = new BaseModel('fakeusers', jsonSchema);
+      model.database(db);
+      //insert documents to do updates
+      var doc1 = {
+        _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
+        firstName: "class",
+        lastName: "dojo"
+      };
+      var doc2 = {
+        _id: ObjectID("52535efb0555c1353a75f54c"),//explicit _id set
+        firstName: "crass",
+        lastName: "mojo"
+      };
+      collection().insert([doc1, doc2], done);
+    });
+
+    afterEach(function(done) {
+      model = oldModel;
+      dropCollection(done);
+    });
+
+    it("updates a document when a document can be found", function(done) {
+      var updateDoc = {
+        firstName: "school",
+        lastName: "dojo"
+      };
+      model.upsert({firstName : "class", lastName : "dojo"}, updateDoc, function(err, doc) {
+        failOnError(err);
+        assertObjectEquals(doc, {firstName : 'school', lastName : 'dojo'});
+        done();
+      });
+    });
+    it("inserts a document when no matching document can be found", function(done) {
+      var updateDoc = {
+        firstName: "school",
+        lastName: "dojo"
+      };
+      model.upsert({firstName : "school", lastName : "dojo"}, updateDoc, function(err, doc) {
+        failOnError(err);
+        assertObjectEquals(doc, {firstName : 'school', lastName : 'dojo'});
+        done();
+      });
+    });
+    it("fails when a field not defined in the schema is passed in", function(done) {
+      var updateDoc = {
+        firstName: "school",
+        lastName: "dojo",
+        zoobuddydoo : true
+      };
+      model.upsert({firstName : "school", lastName : "dojo"}, updateDoc, function(err, doc) {
+        expect(err.errors[0].message).to.be("Additional properties are not allowed");
+        done();
+      });
+    });
+  });
   describe("#update", function() {
 
     var oldModel;
