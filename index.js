@@ -11,7 +11,7 @@ var Schema = require('mongo-json-schema');
  */
 
 var BaseModel = (function() {
-  var InvalidMongoIdError, NotFoundError, indices;
+  var InvalidMongoIdError, DuplicateKeyError, NotFoundError, indices;
 
   function BaseModel(collectionName, schema, overrideDatabase) {
     if (!collectionName) {
@@ -92,6 +92,7 @@ var BaseModel = (function() {
 
   BaseModel.prototype.create = function(toInsert, cb) {
     var arrayInput, ex, outputFormatter, schema;
+    var that = this;
     schema = this.jsonSchema;
     outputFormatter = this.__outputFormatter;
     if (!schema) {
@@ -131,6 +132,13 @@ var BaseModel = (function() {
         safe: true
       }, function(err, result) {
         if (err) {
+          if (/duplicate key error/.test(err.message)){
+              return cb(DuplicateKeyError({
+                message : err.message,
+                doc: toInsert,
+                collection: that.__collectionName
+              }));
+          }
           return cb(err);
         }
         return process.nextTick(function() {
@@ -710,6 +718,12 @@ var BaseModel = (function() {
       error = new Error();
       error.message = 'Not found';
       return decorateError(error, 'NotFound', detail);
+    },
+    duplicateKey: DuplicateKeyError = function(detail) {
+      var error;
+      error = new Error();
+      error.message = 'Duplicate Key';
+      return decorateError(error, 'DuplicateKey', detail);
     }
   };
 

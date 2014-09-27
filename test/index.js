@@ -24,12 +24,21 @@ describe("BaseModel", function() {
   var model;
 
   var collection = function() {
-    return db.collection('fakeusers');
+    var retval = db.collection('fakeusers');
+    return retval;
   };
 
   var dropCollection = function(cb) {
     if(collection()) {
-      collection().drop(cb);
+      collection().drop(function(err){
+        if (err){
+          if (/ns not found/.test(err.message)){
+            return cb();
+          }
+          return cb(err);
+        }
+        return cb();
+      });
     } else {
       cb();
     }
@@ -110,16 +119,16 @@ describe("BaseModel", function() {
 
     var oldModel;
 
-    before(function() {
+    beforeEach(function() {
       oldModel = model;
       model = new BaseModel('fakeusers', jsonSchema);
       model.database(db);
     });
+    afterEach(function(done) {
+      dropCollection(done);
+    });
 
     describe("one document", function() {
-      after(function(done) {
-        dropCollection(done);
-      });
 
       it("should create the document in the database", function(done) {
         var newDoc = {
@@ -134,6 +143,20 @@ describe("BaseModel", function() {
               expect(docs).to.have.length(1);
               done();
             });
+          });
+        });
+      });
+
+      it("returns a duplicate key error if one is raised", function(done) {
+        var newDoc = {
+          firstName: "class",
+          lastName: "dojo"
+        };
+        model.create(newDoc, function(err, doc) {
+          expect(err).to.be(null);
+          model.create(newDoc, function(err, doc) {
+            expect(err.DuplicateKey).to.be.ok();
+            done();
           });
         });
       });
@@ -927,7 +950,7 @@ describe("BaseModel", function() {
     });
   });
   describe("#remove", function() {
-    before(function(done) {
+    beforeEach(function(done) {
       var doc1 = {
         _id: ObjectID("52535efb0555c1353a75f54b"),//explicit _id set
         firstName: "class",
@@ -941,7 +964,7 @@ describe("BaseModel", function() {
       collection().insert([doc1, doc2], done);
     });
 
-    after(function(done) {
+    afterEach(function(done) {
       dropCollection(done);
     });
 
